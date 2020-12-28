@@ -10,12 +10,12 @@ from yolo_resnet import yolo
 from predict import detect
 # import torch
 # from torchvision.models import resnet50
-
+load = torch.hub.load_state_dict_from_url('https://drive.google.com/file/d/14qu1zKOXxJhI7JnjrZ9qz8-jt7T4WBp7/view?usp=sharing')
 # load = './weights.pt'
 net = yolo()
 # resnet = resnet50(pretrained=True)
-# net.load_state_dict(torch.load(load))
-# net.eval()
+net.load_state_dict(load)
+net.eval()
 
 app = Flask(__name__)
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
