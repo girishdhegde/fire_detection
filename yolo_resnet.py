@@ -18,7 +18,7 @@ C = 2
 
 E = (C+B*5)
 
-resnet50 = models.resnet50(pretrained=True)
+resnet50 = models.resnet50(pretrained=False)
 
 # print(resnet50)
 
