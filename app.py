@@ -9,11 +9,11 @@ import cv2
 # from yolo_resnet import yolo
 # from predict import detect
 # import torch
-from torchvision import datasets, models, transforms
+from torchvision.models import resnet50
 
 # load = './weights.pt'
 # net = yolo()
-resnet50 = models.resnet50(pretrained=True)
+resnet = resnet50(pretrained=True)
 
 # net.load_state_dict(torch.load(load))
 # net.eval()
