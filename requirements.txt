@@ -1,7 +1,6 @@
 numpy==1.19.2
 flask==1.1.2
-torch==1.7.1
-torchvision==0.8.2
-torchaudio==0.7.2
+https://download.pytorch.org/whl/cpu/torch-1.7.1.post2-cp37-cp37m-linux_x86_64.whl
+https://download.pytorch.org/whl/cpu/torchvision-0.8.2.post2-cp37-cp37m-linux_x86_64.whl
 opencv-python
 gunicorn==20.0.4
