@@ -6,15 +6,14 @@ import torch
 import cv2
 # import shutil
 #from werkzeug import secure_filename
-# from yolo_resnet import yolo
-# from predict import detect
+from yolo_resnet import yolo
+from predict import detect
 # import torch
-from torchvision.models import resnet50
+# from torchvision.models import resnet50
 
 # load = './weights.pt'
-# net = yolo()
-resnet = resnet50(pretrained=True)
-
+net = yolo()
+# resnet = resnet50(pretrained=True)
 # net.load_state_dict(torch.load(load))
 # net.eval()
 
@@ -37,9 +36,9 @@ def home():
 
         f.save(path1)
 
-        # img = cv2.imread(path1)
-        # out = detect(img, net)
-        # cv2.imwrite(path2, out)
+        img = cv2.imread(path1)
+        out = detect(img, net)
+        cv2.imwrite(path2, out)
 
         return render_template("upload.html", img1=path1, img2=path2)
 
