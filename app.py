@@ -11,6 +11,7 @@ from predict import detect
 # import torch
 # from torchvision.models import resnet50
 torch.hub.download_url_to_file('https://www.dropbox.com/s/a1puv47v6tmrk6j/weights.pt?dl=1', './weight.pt')
+torch.hub.download_url_to_file('https://www.dropbox.com/s/a1puv47v6tmrk6j/weights.pt?dl=1', './weight2.pt')
 # load = './weights.pt'
 net = yolo()
 net.load_state_dict(torch.load('./weight.pt'))
