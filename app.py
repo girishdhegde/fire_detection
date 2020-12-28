@@ -4,22 +4,13 @@ import flask
 from flask import Flask,request,jsonify,url_for,render_template
 import torch
 import cv2
-# import shutil
-#from werkzeug import secure_filename
 from yolo_resnet import yolo
 from predict import detect
-# import torch
-# from torchvision.models import resnet50
+
 torch.hub.download_url_to_file('https://www.dropbox.com/s/a1puv47v6tmrk6j/weights.pt?dl=1', './weight.pt')
-torch.hub.download_url_to_file('https://www.dropbox.com/s/a1puv47v6tmrk6j/weights.pt?dl=1', './weight2.pt')
-# load = './weights.pt'
 net = yolo()
 net.load_state_dict(torch.load('./weight.pt'))
 net.eval()
-
-net2 = yolo()
-net2.load_state_dict(torch.load('./weight2.pt'))
-net2.eval()
 
 app = Flask(__name__)
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
