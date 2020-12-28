@@ -10,11 +10,12 @@ from yolo_resnet import yolo
 from predict import detect
 # import torch
 # from torchvision.models import resnet50
-load = torch.hub.load_state_dict_from_url('https://drive.google.com/file/d/14qu1zKOXxJhI7JnjrZ9qz8-jt7T4WBp7/view?usp=sharing')
+torch.hub.download_url_to_file('https://www.dropbox.com/s/a1puv47v6tmrk6j/weights.pt?dl=1', './weight.pt')
 # load = './weights.pt'
 net = yolo()
+net.load_state_dict(torch.load('./weight.pt'))
 # resnet = resnet50(pretrained=True)
-net.load_state_dict(load)
+# net.load_state_dict(load)
 net.eval()
 
 app = Flask(__name__)
