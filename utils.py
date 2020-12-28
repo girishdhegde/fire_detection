@@ -186,230 +186,230 @@ def nms(prediction, conf_th=0.5, iou_th=0.5, S=7, B=2, C=20):
 
     return out
 
-def render(img, prediction, classes, ):
-    pass
+# def render(img, prediction, classes, ):
+#     pass
 
-def MAP():
-    pass
-
-
-class yoloLoss(nn.Module):
-    def __init__(self, S=7, B=2, C=20, coord=5, noobj=0.5):
-        super().__init__()
-        self.S = S
-        self.B = B
-        self.C = C
-        self.lambda_coord = coord
-        self.lambda_noobj = noobj
-
-    def forward(self, prediction, target):
-        '''
-        Params:
-        prediction: Batch_size x S x S X (5B + C)
-        target    : Batch_size x S x S x ( 5 + C)
-        (Don't use inplace operators)
-        '''
-
-        with torch.no_grad():
-            bs = prediction.shape[0]
-            # (center x, center y, height, width) attributes of bboxes, to 
-            # (top-left corner x, top-left corner y, right-bottom corner x, right-bottom corner y)
-            pred_converted   = convert(prediction, self.S, self.B)
-            target_converted = convert(target, self.S, B=1)
-
-        centre_loss = torch.tensor(0.0)
-        dim_loss = torch.tensor(0.0)
-        conf_loss = torch.tensor(0.0)
-        no_conf_loss = torch.tensor(0.0)
-        class_loss = torch.tensor(0.0)
-
-        # for all image in batch
-        for pred_idx in range(bs):
-            # for all grid cells in image
-            for row in range(self.S):
-                for col in range(self.S):
-                    with torch.no_grad():
-                        bbox_idx  = 0
-                        iou_score = 0
-                        # Finding i.e. has the highest IOU of any predictor in that grid cell
-                        box1 = pred_converted[pred_idx, row, col, 0: 5*self.B].view(self.B, 5)
-                        box2 = target_converted[pred_idx, row, col, 0: 5].repeat(self.B, 1)
-                        # Calculating IOU b/n prediction and target
-                        iou_score = iou(box1, box2)
-                        bbox_idx  = torch.argmax(iou_score)
-                        # print(iou_score, bbox_idx)
-
-                    obj_present = True if target[pred_idx, row, col, 4] > 0 else False
-
-                    if obj_present:
-                        pred_x, pred_y, pred_w, pred_h, pred_p = prediction[pred_idx, row, col, 5*bbox_idx: 5*bbox_idx+5]
-                        targ_x, targ_y, targ_w, targ_h, targ_p = target[pred_idx, row, col, 0: 5]
-                        # centers: (x, y) loss where there is a object
-                        centre_loss = ((pred_x - targ_x) ** 2 + (pred_y - targ_y) ** 2) + centre_loss
-
-                        # width and height loss where there is a object
-                        dim_loss = ((torch.sign(pred_w) * torch.sqrt(torch.abs(pred_w) + 1e-6) - torch.sqrt(targ_w)) ** 2 +
-                                   (torch.sign(pred_h) * torch.sqrt(torch.abs(pred_h) + 1e-6) - torch.sqrt(targ_h)) ** 2) + dim_loss
-
-                        # Confidence loss where there is a object
-                        # for box_idx in range(self.B):
-                        #     p = prediction[pred_idx, row, col, 5*box_idx+4]
-                        conf_loss = (pred_p - targ_p) ** 2 + conf_loss
-
-                    else:
-                        # Confidence loss where there is no object
-                        targ_p = target[pred_idx, row, col, 4]
-                        for box_idx in range(self.B):
-                            p = prediction[pred_idx, row, col, 5*box_idx+4]
-                            no_conf_loss = (p - targ_p) ** 2 + no_conf_loss
-
-        # Class probability loss
-        obj = target[:, :, :, 4: 5]
-        class_loss = torch.sum(
-                                 obj.repeat(1, 1, 1, self.C) * 
-                                (prediction[:, :, :, 5*self.B:] - target[:, :, :, 5:]) ** 2
-                               ) + class_loss
-
-        loss = (
-                self.lambda_coord * centre_loss + 
-                self.lambda_coord * dim_loss + 
-                conf_loss + 
-                self.lambda_noobj * no_conf_loss + 
-                class_loss
-               ) 
-
-        return loss
+# def MAP():
+#     pass
 
 
+# class yoloLoss(nn.Module):
+#     def __init__(self, S=7, B=2, C=20, coord=5, noobj=0.5):
+#         super().__init__()
+#         self.S = S
+#         self.B = B
+#         self.C = C
+#         self.lambda_coord = coord
+#         self.lambda_noobj = noobj
 
-class YoloLoss(nn.Module):
-    """
-    Calculate the loss for yolo (v1) model
-    """
+#     def forward(self, prediction, target):
+#         '''
+#         Params:
+#         prediction: Batch_size x S x S X (5B + C)
+#         target    : Batch_size x S x S x ( 5 + C)
+#         (Don't use inplace operators)
+#         '''
 
-    def __init__(self, S=7, B=2, C=20):
-        super(YoloLoss, self).__init__()
-        self.mse = nn.MSELoss(reduction="sum")
+#         with torch.no_grad():
+#             bs = prediction.shape[0]
+#             # (center x, center y, height, width) attributes of bboxes, to 
+#             # (top-left corner x, top-left corner y, right-bottom corner x, right-bottom corner y)
+#             pred_converted   = convert(prediction, self.S, self.B)
+#             target_converted = convert(target, self.S, B=1)
 
-        """
-        S is split size of image (in paper 7),
-        B is number of boxes (in paper 2),
-        C is number of classes (in paper and VOC dataset is 20),
-        """
-        self.S = S
-        self.B = B
-        self.C = C
+#         centre_loss = torch.tensor(0.0)
+#         dim_loss = torch.tensor(0.0)
+#         conf_loss = torch.tensor(0.0)
+#         no_conf_loss = torch.tensor(0.0)
+#         class_loss = torch.tensor(0.0)
 
-        # These are from Yolo paper, signifying how much we should
-        # pay loss for no object (noobj) and the box coordinates (coord)
-        self.lambda_noobj = 0.5
-        self.lambda_coord = 5
+#         # for all image in batch
+#         for pred_idx in range(bs):
+#             # for all grid cells in image
+#             for row in range(self.S):
+#                 for col in range(self.S):
+#                     with torch.no_grad():
+#                         bbox_idx  = 0
+#                         iou_score = 0
+#                         # Finding i.e. has the highest IOU of any predictor in that grid cell
+#                         box1 = pred_converted[pred_idx, row, col, 0: 5*self.B].view(self.B, 5)
+#                         box2 = target_converted[pred_idx, row, col, 0: 5].repeat(self.B, 1)
+#                         # Calculating IOU b/n prediction and target
+#                         iou_score = iou(box1, box2)
+#                         bbox_idx  = torch.argmax(iou_score)
+#                         # print(iou_score, bbox_idx)
 
-    def forward(self, predictions, target):
-        # predictions are shaped (BATCH_SIZE, S*S(C+B*5) when inputted
-        # predictions = predictions.reshape(-1, self.S, self.S, self.C + self.B * 5)
-        pred_converted   = convert(predictions, self.S, self.B)
-        target_converted = convert(target, self.S, B=1)
+#                     obj_present = True if target[pred_idx, row, col, 4] > 0 else False
 
-        # predictions = torch.cat([predictions[:, :, :, 10:], predictions[:, :, :, :10]], dim=3)
-        # target      = torch.cat([target[:, :, :, 5:], target[:, :, :, :5]], dim=3)
-        # pred_converted = torch.cat([pred_converted[:, :, :, 10:], pred_converted[:, :, :, :10]], dim=3)
-        # target_converted = torch.cat([target_converted[:, :, :, 5:], target_converted[:, :, :, :5]], dim=3)
-        # Calculate IoU for the two predicted bounding boxes with target bbox
-        iou_b1 = intersection_over_union(pred_converted[..., 0:4], target_converted[..., 0:4], 'corners')
-        iou_b2 = intersection_over_union(pred_converted[..., 5:9], target_converted[..., 0:4], 'corners')
-        # print(iou_b1, iou_b2)
-        ious = torch.cat([iou_b1.unsqueeze(0), iou_b2.unsqueeze(0)], dim=0)
+#                     if obj_present:
+#                         pred_x, pred_y, pred_w, pred_h, pred_p = prediction[pred_idx, row, col, 5*bbox_idx: 5*bbox_idx+5]
+#                         targ_x, targ_y, targ_w, targ_h, targ_p = target[pred_idx, row, col, 0: 5]
+#                         # centers: (x, y) loss where there is a object
+#                         centre_loss = ((pred_x - targ_x) ** 2 + (pred_y - targ_y) ** 2) + centre_loss
 
-        # Take the box with highest IoU out of the two prediction
-        # Note that bestbox will be indices of 0, 1 for which bbox was best
-        iou_maxes, bestbox = torch.max(ious, dim=0)
-        exists_box = target[..., 4].unsqueeze(3)  # in paper this is Iobj_i
+#                         # width and height loss where there is a object
+#                         dim_loss = ((torch.sign(pred_w) * torch.sqrt(torch.abs(pred_w) + 1e-6) - torch.sqrt(targ_w)) ** 2 +
+#                                    (torch.sign(pred_h) * torch.sqrt(torch.abs(pred_h) + 1e-6) - torch.sqrt(targ_h)) ** 2) + dim_loss
 
-        # ======================== #
-        #   FOR BOX COORDINATES    #
-        # ======================== #
+#                         # Confidence loss where there is a object
+#                         # for box_idx in range(self.B):
+#                         #     p = prediction[pred_idx, row, col, 5*box_idx+4]
+#                         conf_loss = (pred_p - targ_p) ** 2 + conf_loss
 
-        # Set boxes with no object in them to 0. We only take out one of the two 
-        # predictions, which is the one with highest Iou calculated previously.
-        box_predictions = exists_box * (
-            (
-                bestbox * predictions[..., 5:9]
-                + (1 - bestbox) * predictions[..., 0:4]
-            )
-        )
+#                     else:
+#                         # Confidence loss where there is no object
+#                         targ_p = target[pred_idx, row, col, 4]
+#                         for box_idx in range(self.B):
+#                             p = prediction[pred_idx, row, col, 5*box_idx+4]
+#                             no_conf_loss = (p - targ_p) ** 2 + no_conf_loss
 
-        box_targets = exists_box * target[..., 0:4]
+#         # Class probability loss
+#         obj = target[:, :, :, 4: 5]
+#         class_loss = torch.sum(
+#                                  obj.repeat(1, 1, 1, self.C) * 
+#                                 (prediction[:, :, :, 5*self.B:] - target[:, :, :, 5:]) ** 2
+#                                ) + class_loss
 
-        # Take sqrt of width, height of boxes to ensure that
-        # box_predictions[..., 2:4] = torch.sign(box_predictions[..., 2:4]) * torch.sqrt(torch.abs(box_predictions[..., 2:4]) + 1e-6)
-        # box_targets[..., 2:4] = torch.sqrt(box_targets[..., 2:4])
+#         loss = (
+#                 self.lambda_coord * centre_loss + 
+#                 self.lambda_coord * dim_loss + 
+#                 conf_loss + 
+#                 self.lambda_noobj * no_conf_loss + 
+#                 class_loss
+#                ) 
 
-        box_loss_xy = self.mse(
-            torch.flatten(box_predictions[:, :, :, :2], end_dim=-2),
-            torch.flatten(box_targets[:, :, :, :2], end_dim=-2),
-        )
-        whp = torch.sign(box_predictions[..., 2:4]) * torch.sqrt(torch.abs(box_predictions[..., 2:4]) + 1e-6)
-        wht = torch.sqrt(box_targets[..., 2:4])
-        box_loss_wh = self.mse(
-            torch.flatten(whp, end_dim=-2),
-            torch.flatten(wht, end_dim=-2),
-        )
+#         return loss
 
-        # ==================== #
-        #   FOR OBJECT LOSS    #
-        # ==================== #
 
-        # pred_box is the confidence score for the bbox with highest IoU
-        pred_box = (
-            bestbox * predictions[..., 9:10] + (1 - bestbox) * predictions[..., 4:5]
-        )
 
-        object_loss = self.mse(
-            torch.flatten(exists_box * pred_box),
-            torch.flatten(exists_box * target[..., 4:5]),
-        )
+# class YoloLoss(nn.Module):
+#     """
+#     Calculate the loss for yolo (v1) model
+#     """
 
-        # ======================= #
-        #   FOR NO OBJECT LOSS    #
-        # ======================= #
+#     def __init__(self, S=7, B=2, C=20):
+#         super(YoloLoss, self).__init__()
+#         self.mse = nn.MSELoss(reduction="sum")
 
-        #max_no_obj = torch.max(predictions[..., 20:21], predictions[..., 25:26])
-        #no_object_loss = self.mse(
-        #    torch.flatten((1 - exists_box) * max_no_obj, start_dim=1),
-        #    torch.flatten((1 - exists_box) * target[..., 20:21], start_dim=1),
-        #)
+#         """
+#         S is split size of image (in paper 7),
+#         B is number of boxes (in paper 2),
+#         C is number of classes (in paper and VOC dataset is 20),
+#         """
+#         self.S = S
+#         self.B = B
+#         self.C = C
 
-        no_object_loss = self.mse(
-            torch.flatten((1 - exists_box) * predictions[..., 4:5], start_dim=1),
-            torch.flatten((1 - exists_box) * target[..., 4:5], start_dim=1),
-        )
+#         # These are from Yolo paper, signifying how much we should
+#         # pay loss for no object (noobj) and the box coordinates (coord)
+#         self.lambda_noobj = 0.5
+#         self.lambda_coord = 5
 
-        no_object_loss += self.mse(
-            torch.flatten((1 - exists_box) * predictions[..., 9:10], start_dim=1),
-            torch.flatten((1 - exists_box) * target[..., 4:5], start_dim=1)
-        )
+#     def forward(self, predictions, target):
+#         # predictions are shaped (BATCH_SIZE, S*S(C+B*5) when inputted
+#         # predictions = predictions.reshape(-1, self.S, self.S, self.C + self.B * 5)
+#         pred_converted   = convert(predictions, self.S, self.B)
+#         target_converted = convert(target, self.S, B=1)
 
-        # ================== #
-        #   FOR CLASS LOSS   #
-        # ================== #
+#         # predictions = torch.cat([predictions[:, :, :, 10:], predictions[:, :, :, :10]], dim=3)
+#         # target      = torch.cat([target[:, :, :, 5:], target[:, :, :, :5]], dim=3)
+#         # pred_converted = torch.cat([pred_converted[:, :, :, 10:], pred_converted[:, :, :, :10]], dim=3)
+#         # target_converted = torch.cat([target_converted[:, :, :, 5:], target_converted[:, :, :, :5]], dim=3)
+#         # Calculate IoU for the two predicted bounding boxes with target bbox
+#         iou_b1 = intersection_over_union(pred_converted[..., 0:4], target_converted[..., 0:4], 'corners')
+#         iou_b2 = intersection_over_union(pred_converted[..., 5:9], target_converted[..., 0:4], 'corners')
+#         # print(iou_b1, iou_b2)
+#         ious = torch.cat([iou_b1.unsqueeze(0), iou_b2.unsqueeze(0)], dim=0)
 
-        class_loss = self.mse(
-            torch.flatten(exists_box * predictions[..., 10:], end_dim=-2,),
-            torch.flatten(exists_box * target[..., 5:], end_dim=-2,),
-        )
+#         # Take the box with highest IoU out of the two prediction
+#         # Note that bestbox will be indices of 0, 1 for which bbox was best
+#         iou_maxes, bestbox = torch.max(ious, dim=0)
+#         exists_box = target[..., 4].unsqueeze(3)  # in paper this is Iobj_i
 
-        loss = (
-            self.lambda_coord * box_loss_xy  # first two rows in paper
-            + self.lambda_coord * box_loss_wh
-            + object_loss  # third row in paper
-            + self.lambda_noobj * no_object_loss  # forth row
-            + class_loss  # fifth row
-        )
-        return loss
+#         # ======================== #
+#         #   FOR BOX COORDINATES    #
+#         # ======================== #
 
-if __name__ == '__main__':
-    pass
+#         # Set boxes with no object in them to 0. We only take out one of the two 
+#         # predictions, which is the one with highest Iou calculated previously.
+#         box_predictions = exists_box * (
+#             (
+#                 bestbox * predictions[..., 5:9]
+#                 + (1 - bestbox) * predictions[..., 0:4]
+#             )
+#         )
+
+#         box_targets = exists_box * target[..., 0:4]
+
+#         # Take sqrt of width, height of boxes to ensure that
+#         # box_predictions[..., 2:4] = torch.sign(box_predictions[..., 2:4]) * torch.sqrt(torch.abs(box_predictions[..., 2:4]) + 1e-6)
+#         # box_targets[..., 2:4] = torch.sqrt(box_targets[..., 2:4])
+
+#         box_loss_xy = self.mse(
+#             torch.flatten(box_predictions[:, :, :, :2], end_dim=-2),
+#             torch.flatten(box_targets[:, :, :, :2], end_dim=-2),
+#         )
+#         whp = torch.sign(box_predictions[..., 2:4]) * torch.sqrt(torch.abs(box_predictions[..., 2:4]) + 1e-6)
+#         wht = torch.sqrt(box_targets[..., 2:4])
+#         box_loss_wh = self.mse(
+#             torch.flatten(whp, end_dim=-2),
+#             torch.flatten(wht, end_dim=-2),
+#         )
+
+#         # ==================== #
+#         #   FOR OBJECT LOSS    #
+#         # ==================== #
+
+#         # pred_box is the confidence score for the bbox with highest IoU
+#         pred_box = (
+#             bestbox * predictions[..., 9:10] + (1 - bestbox) * predictions[..., 4:5]
+#         )
+
+#         object_loss = self.mse(
+#             torch.flatten(exists_box * pred_box),
+#             torch.flatten(exists_box * target[..., 4:5]),
+#         )
+
+#         # ======================= #
+#         #   FOR NO OBJECT LOSS    #
+#         # ======================= #
+
+#         #max_no_obj = torch.max(predictions[..., 20:21], predictions[..., 25:26])
+#         #no_object_loss = self.mse(
+#         #    torch.flatten((1 - exists_box) * max_no_obj, start_dim=1),
+#         #    torch.flatten((1 - exists_box) * target[..., 20:21], start_dim=1),
+#         #)
+
+#         no_object_loss = self.mse(
+#             torch.flatten((1 - exists_box) * predictions[..., 4:5], start_dim=1),
+#             torch.flatten((1 - exists_box) * target[..., 4:5], start_dim=1),
+#         )
+
+#         no_object_loss += self.mse(
+#             torch.flatten((1 - exists_box) * predictions[..., 9:10], start_dim=1),
+#             torch.flatten((1 - exists_box) * target[..., 4:5], start_dim=1)
+#         )
+
+#         # ================== #
+#         #   FOR CLASS LOSS   #
+#         # ================== #
+
+#         class_loss = self.mse(
+#             torch.flatten(exists_box * predictions[..., 10:], end_dim=-2,),
+#             torch.flatten(exists_box * target[..., 5:], end_dim=-2,),
+#         )
+
+#         loss = (
+#             self.lambda_coord * box_loss_xy  # first two rows in paper
+#             + self.lambda_coord * box_loss_wh
+#             + object_loss  # third row in paper
+#             + self.lambda_noobj * no_object_loss  # forth row
+#             + class_loss  # fifth row
+#         )
+#         return loss
+
+# if __name__ == '__main__':
+#     pass
 
     # criterion =  yoloLoss(7, 2, 20, 5, 0.5)
     # pred = torch.randn((1, 7, 7, 30), requires_grad=True)
