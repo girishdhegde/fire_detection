@@ -15,9 +15,11 @@ torch.hub.download_url_to_file('https://www.dropbox.com/s/a1puv47v6tmrk6j/weight
 # load = './weights.pt'
 net = yolo()
 net.load_state_dict(torch.load('./weight.pt'))
-# resnet = resnet50(pretrained=True)
-# net.load_state_dict(load)
 net.eval()
+
+net2 = yolo()
+net2.load_state_dict(torch.load('./weight2.pt'))
+net2.eval()
 
 app = Flask(__name__)
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
